@@ -15,6 +15,8 @@
  ***********************************************************************/
 package com.turkerozturk;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -28,21 +30,26 @@ import java.util.Scanner;
 /**
  * @author Turker Ozturk
  * @version First Version 2023-03-16
- * This software website: https://github.com/turkerozturk/cherrycsv-for-cherrytree
- * CherryTree owner's website: https://github.com/giuspen/cherrytree
+ * This software website: <a href="https://github.com/turkerozturk/cherrycsv-for-cherrytree">...</a>
+ * CherryTree owner's website: <a href="https://github.com/giuspen/cherrytree">...</a>
  * Tested on CTB SQLite file of CherryTree (version 0.99.53) application.
  */
 public class Main {
+    private static final Logger logger = LogManager.getLogger(Main.class);
     private static final String WORKING_DIR = System.getProperty("user.dir");
     private static final String JDBC_STRING = "jdbc:sqlite:";
     private static final String TASK_LIST = "cherrytemplatetasks";
     private static final String TEMPLATE_PREFIX = "cherrytemplate";
     private static final String PROJECT_PREFIX = TEMPLATE_PREFIX;
     private static final String CSV_OUTPUT_FILE_PREFIX = "cherrycsv";
-    private static String message = "" +
+
+    private static final String DEFAULT_CTB = "cherrytree.ctb";
+
+    private static final String helpTextForUsage = "" +
             "USAGE: \n\t\t" +
             "java -jar cherrycsv-for-cherrytree.jar \n" +
-            "\tWithout given a path parameter, the program assumes that the input file \n\tis named \"cherrytree.ctb\" and located in the " +
+            "\tWithout given a path parameter, the program assumes that the input file " +
+            "\n\tis named \"cherrytree.ctb\" and located in the " +
             "same path with itself.\n\n" +
             "\tOR\n" +
             "\t\tjava -jar cherrycsv-for-cherrytree.jar <full local path of the ctb file>\n" +
@@ -54,7 +61,19 @@ public class Main {
 
     public static void main(String[] args) {
 
-        System.out.println("STARTING..\n");
+        logger.info("START\n");
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append("COMMAND LINE ARGUMENTS\n\n");
+        if(args.length > 0) {
+            for (int i = 0; i < args.length; i++) {
+                stringBuilder.append(String.format("Argument %d = \"%s\"\n", i, args[i]));
+            }
+        } else {
+            stringBuilder.append("Started without arguments. Default values are;\n\n");
+            stringBuilder.append("CTB File Full Path: " + WORKING_DIR + File.separator + DEFAULT_CTB + "\n" +
+                    "(It will search the CTB file in the folder which it is running.)\n");
+        }
+        logger.debug(stringBuilder);
 
         String inputPath = null;
         String inputFilename = null;
@@ -62,7 +81,7 @@ public class Main {
 
         if (args.length != 1) {
             inputPath = WORKING_DIR;
-            inputFilename = "cherrytree.ctb";
+            inputFilename = DEFAULT_CTB;
             fullLocalPathToCherryDb = inputPath + File.separator + inputFilename;
         } else {
             fullLocalPathToCherryDb = args[0];
@@ -71,34 +90,32 @@ public class Main {
                 inputPath = p.getParent().toString();
                 inputFilename = p.getFileName().toString();
             } catch (InvalidPathException | NullPointerException ex) {
-                System.out.println("ERROR: File Path is invalid: \"" + fullLocalPathToCherryDb + "\"\n\n" +
-                        message);
+                logger.error("ERROR: File Path is invalid: \"" + fullLocalPathToCherryDb + "\"\n\n" +
+                        helpTextForUsage);
                 goExit();
             }
         }
 
         if (checkExistenceOfCtbDatabase(fullLocalPathToCherryDb)) {
-            System.out.println("FOUND: CTB file \n\t" + fullLocalPathToCherryDb + "\n");
-            System.out.println("IMPORTANT: Always work on copy of your CTB file. " +
-                    "\n\tBecause it can create unwanted nodes if you dont know what you are doing." +
-                    "\n\tOr if you forgot to close other software, whose using the same CTB database" +
-                    "\n\t(e.g. Cherry Tree, DB Browser) it can brake your database!!! " +
+            logger.info("FOUND: CTB file \n\t" + fullLocalPathToCherryDb + "\n");
+            logger.info("IMPORTANT: Always work with backup copy of the CTB file!" +
+                    "\n\tIt can brake your database!!! " +
+                    "\n\tNO RESPONSIBILITY!!!" +
                     "\n\tTESTED ON CherryTree 0.99.53\n");
 
-            System.out.println("Do you want to continue (y/n)? n");
+            logger.info("Do you want to continue (y/n)? (DEFAULT: n)");
             Scanner input = new Scanner(System.in);
             String c = input.nextLine();
             if(!c.equalsIgnoreCase("y")){
-                System.out.println("CANCELLED!");
-              //  System.out.println("\n" + message);
+                logger.info("CONFIRM?\n\nn\n\nCANCELLED!..");
                 goExit();
             } else {
-                System.out.println("\n");
+                logger.debug("CONFIRM?\n\ny\n\ncontinuing..");
             }
 
 
         } else {
-            System.out.println("\n" + message);
+            logger.info(helpTextForUsage);
             goExit();
         }
 
@@ -108,33 +125,42 @@ public class Main {
         try (Connection connection = DriverManager.getConnection(JDBC_STRING + fullLocalPathToCherryDb)) {
 
             String[] cherryTaskNames = getTaskNames(connection);
+            logger.info(String.format("The node named \"%s\" contains these 'template tasks' below:" +
+                    "\n\n%s\n", TASK_LIST, String.join("\n", cherryTaskNames)));
 
             if(cherryTaskNames != null && cherryTaskNames.length != 0) {
-
+                logger.debug(String.format("To each task label, we add the \"%s-\" prefix.\n\n" +
+                        "A 'template task' with that prefix together called 'template name'.\n\n ", TEMPLATE_PREFIX));
                 for (int i = 0; i < cherryTaskNames.length; i++) {
                     // BASLA FARKLI CSVLER DONGU BASLANGICI
                     String cherryTaskName = cherryTaskNames[i];
                     final String projectStartTag = String.format("%s-%s", PROJECT_PREFIX, cherryTaskName);
                     final String templateName = String.format("%s-%s", TEMPLATE_PREFIX, cherryTaskName);
-                    final String OUTPUT_FILENAME = String.format("%s-%s-%s.csv", inputFilename, CSV_OUTPUT_FILE_PREFIX, cherryTaskName);
+                    final String OUTPUT_FILENAME = String.format("%s-%s-%s.csv", inputFilename,
+                            CSV_OUTPUT_FILE_PREFIX, cherryTaskName);
                     final String pathToCsvFile = OUTPUT_PATH + File.separator + OUTPUT_FILENAME;
                     final File fout = new File(pathToCsvFile);
 
                     DbLabel label = new DbLabel();
+                    logger.debug(String.format("TASK %d/%d: Searching the template name in the node names;" +
+                            "\n\n\"%s\"", i + 1, cherryTaskNames.length ,templateName));
                     final String[] labels = label.dbSelectTemplateLabels(templateName, connection);
                     if (labels != null) {
-                        System.out.println("TASK: Task " + i + " STARTED \"" + cherryTaskName + "\". Processing \"" + templateName + "\" template.");
+                        logger.info("TASK: Task " + (i + 1) + " STARTED \"" + cherryTaskName +
+                                "\". Processing \"" + templateName + "\" template.");
                         deleteCurrentOutputFile(pathToCsvFile);
 
 
                         StringBuilder reportStringBuilder = new StringBuilder();
 
-                        CsvHeader csvHeader = new CsvHeader();
-                        reportStringBuilder.append(csvHeader.doCsvHeaderRow(labels));
+                        CsvHeaderRow csvHeaderRow = new CsvHeaderRow();
+                        reportStringBuilder.append(csvHeaderRow.doCsvHeaderRow(labels));
                         reportStringBuilder.append(CsvRowHigh.NEWLINE_SEPARATOR);
 
                         Motor motor = new Motor();
-                        reportStringBuilder.append(motor.doCsvDataRowsAndExport(projectStartTag, csvHeader, connection));
+                        String finalRowAsLine = motor.doCsvDataRowsAndExport(projectStartTag, csvHeaderRow, connection);
+                        logger.debug("FİNAL ROW LINE:\n\n" + finalRowAsLine);
+                        reportStringBuilder.append(finalRowAsLine);
 
                         FileOutputStream fileOutputStream = new FileOutputStream(fout);
                         fileOutputStream.write(239); // This prefix indicates that the content is
@@ -145,18 +171,16 @@ public class Main {
                         BufferedWriter bufferedWriter = new BufferedWriter(printWriter);
 
                         bufferedWriter.write(reportStringBuilder.toString());
-
                         bufferedWriter.flush();
                         bufferedWriter.close();
-                        System.out.println("TASK: Task " + i + " COMPLETED. Output created:" +
+                        logger.info("TASK: Task " + (i + 1) + " COMPLETED. Output created:" +
                                 "\n\t\"" + pathToCsvFile + "\"\n");
                     } else {
-                        System.out.println(String.format("The \"%s\" file in \"%s\" path \n" +
+                        logger.warn(String.format("The \"%s\" file in \"%s\" path \n" +
                                 "has no template definition " +
                                 "named \"%s\" inside the tag field of any " +
                                 "nodes.\n", inputFilename, inputPath, templateName));
                     }
-
                 }
             } else {
                 goExit();
@@ -170,9 +194,10 @@ public class Main {
     }
 
     private static String[] getTaskNames(Connection connection) throws SQLException {
-        Statement statement = connection.createStatement();
-        String query = "SELECT node.txt FROM node WHERE node.name IS \"" + TASK_LIST + "\" LIMIT 1;";
-        ResultSet resultSet = statement.executeQuery(query);
+        String query = "SELECT node.txt FROM node WHERE node.name IS ? LIMIT 1;";
+        PreparedStatement statement = connection.prepareStatement(query);
+        statement.setString(1, TASK_LIST);
+        ResultSet resultSet = statement.executeQuery();
         String taskListStringRaw = resultSet.getString("txt");
         if(taskListStringRaw != null) {
             if( taskListStringRaw.length() > 0){
@@ -190,11 +215,12 @@ public class Main {
                     return strArray;
                 }
             } else {
-                System.out.println("WARNING: The node named \""+ TASK_LIST + "\" content was empty or started with \""
+                logger.warn("WARNING: The node named \""+ TASK_LIST + "\" content was empty or started with \""
                         + CHERRY_LINE_COMMENT_CHAR + "\" comment character. No task template names found.");
             }
         } else {
-            System.out.println("WARNING: The node named \""+ TASK_LIST + "\" not found in any node names. You need to create one.");
+            logger.warn("WARNING: The node named \""+ TASK_LIST + "\" " +
+                    "not found in any node names. You need to create one.");
         }
 
 
@@ -207,20 +233,22 @@ public class Main {
         try {
             Files.deleteIfExists(Paths.get(outputPath));
         } catch (IOException ex) {
-            System.out.println("ERROR: Cannot delete previous CSV report file! Please delete " + outputPath + " manually and then run again!");
+            logger.error("ERROR: Cannot delete previous CSV report file! Please " +
+                    "delete " + outputPath + " manually and then run again!");
             goExit();
         }
     }
     private static boolean checkExistenceOfCtbDatabase(String pathToCherryDb) {
         if (!Files.exists(Paths.get(pathToCherryDb))) {
-            System.out.println("ERROR: Cherrytree CTB database file " + pathToCherryDb + " not found!");
+            logger.error(String.format("NOT FOUND: CTB database\n\n%s", pathToCherryDb ));
             return false;
         }
         return true;
     }
     public static void goExit() {
-        System.out.println(HELP_STRING);
-        System.out.println("\nEXITING..");
+        logger.info(HELP_STRING);
+
+        logger.info("EXIT");
         System.exit(0);
     }
 

@@ -15,13 +15,15 @@
  ***********************************************************************/
 package com.turkerozturk;
 
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import java.sql.*;
 import java.util.LinkedHashSet;
 
 public class DbFieldCreator {
+
+    private static final Logger logger = LogManager.getLogger(DbFieldCreator.class);
 
     /**
      * Each project node must contain certain child nodes determined by this program.
@@ -33,7 +35,7 @@ public class DbFieldCreator {
         String queryForNodeId = "select max(node_id) as sayi from node limit 1;";
         Statement statementNo3 = connection.createStatement();
         ResultSet rtt = statementNo3.executeQuery(queryForNodeId);
-        int musaitNodeId = rtt.getInt("sayi") + 1;
+        long musaitNodeId = rtt.getInt("sayi") + 1;
         // CTB dosyasindaki bir Node nin alt Nodelerinin siralanmasi sequence isimli sql alani ile yapiliyor.
         // Ekleyecegimiz dugumler varsa mevcut dugumlerin sirasini bozmadan sona eklenmesi ve bir sira numarasi verebilmemiz icin
         // en yuksek sequence degeri elde ediyoruz.
@@ -46,22 +48,25 @@ public class DbFieldCreator {
 
             // START - CREATE THE MISSING NODE
             String queryForInsertNode = "insert into node (node_id, name, txt, syntax, tags, is_ro, is_richtxt, " +
-                    "has_codebox, has_table, has_image, level, ts_creation, ts_lastsave) values (" +
-                    musaitNodeId +
-                    ", \"" +
-                    missingLabel +
-                    "\", \"\", \"plain-text\", \"variable\", 0, 0, 0, 0, 0, 0, " +
+                    "has_codebox, has_table, has_image, level, ts_creation, ts_lastsave) " +
+                    "values (?, ?, \"\", \"plain-text\", \"variable\", 0, 0, 0, 0, 0, 0, " +
                     "CAST(strftime('%statement','now') || '.' || substr(strftime('%f','now'),4,3) AS REAL), " +
                     "CAST(strftime('%statement','now') || '.' || substr(strftime('%f','now'),4,3) AS REAL));";
-            Statement qfin = connection.createStatement();
-            qfin.execute(queryForInsertNode);
+            PreparedStatement statement = connection.prepareStatement(queryForInsertNode);
+            statement.setLong(1, musaitNodeId);
+            statement.setString(2, missingLabel);
+            logger.debug(String.format("MISSING DATA NODE CREATION:\n\n%s", statement));
+            statement.execute();
             // END - CREATE THE MISSING NODE
 
             // START - CREATE RELATION BETWEEN NEW NODE AND HIS PARENT NODE
-            String queryForInsertFatherChild = "insert into children(node_id, father_id, sequence) values(" +
-                    musaitNodeId + ", " + nodeId + ", " + musaitSequenceNumber + ");";
-            Statement qffc = connection.createStatement();
-            qffc.execute(queryForInsertFatherChild);
+            String queryForInsertFatherChild = "insert into children(node_id, father_id, sequence) values(?, ?, ?);";
+            PreparedStatement qffc = connection.prepareStatement(queryForInsertFatherChild);
+            qffc.setLong(1, musaitNodeId);
+            qffc.setLong(2, nodeId);
+            qffc.setInt(3, musaitSequenceNumber);
+            logger.debug(String.format("PARENT RELATION OF DATA NODE CREATION:\n\n%s", qffc));
+            qffc.execute();
             // END - CREATE RELATION BETWEEN NEW NODE AND HIS PARENT NODE
 
             musaitNodeId++;

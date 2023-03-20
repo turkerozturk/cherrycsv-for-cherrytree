@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="INFO">
+
+    <Properties>
+        <Property name="info-prefix">*****</Property>
+        <Property name="error-prefix">*****\nERROR ** ERROR ** ERROR ** ERROR ** ERROR:\n</Property>
+        <Property name="console-pattern">%n%msg%n</Property>
+    </Properties>
+
+    <Appenders>
+
+        <Console name="ConsoleLog" target="SYSTEM_OUT">
+            <PatternLayout pattern="${info-prefix}${console-pattern}" />
+            <LevelRangeFilter minLevel="INFO" maxLevel="INFO" onMatch="ACCEPT" onMismatch="DENY"/>
+        </Console>
+
+        <Console name="ConsoleLogError" target="SYSTEM_OUT">
+            <PatternLayout pattern="${error-prefix}${console-pattern}" />
+            <LevelRangeFilter minLevel="ERROR" maxLevel="ERROR" onMatch="ACCEPT" onMismatch="DENY"/>
+        </Console>
+
+        <File name="AllLevelLog" fileName="cherrycsvlog.html" immediateFlush="false" append="false">
+            <HtmlLayout locationInfo="true"/>
+        </File>
+
+    </Appenders>
+
+    <Loggers>
+
+        <Logger name="com.turkerozturk" additivity="false">
+            <AppenderRef ref="AllLevelLog" level="all"/>
+            <AppenderRef ref="ConsoleLog"  />
+            <AppenderRef ref="ConsoleLogError"  />
+
+        </Logger>
+
+        <Root level="all">
+            <AppenderRef ref="ConsoleLog"/>
+        </Root>
+
+    </Loggers>
+</Configuration>

@@ -15,9 +15,14 @@
  ***********************************************************************/
 package com.turkerozturk;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.util.LinkedHashMap;
 
-public class CsvHeader {
+public class CsvHeaderRow {
+
+    private static final Logger logger = LogManager.getLogger(CsvHeaderRow.class);
     public static final String NODE_ID_LABEL = "nodeid";
     public static final String NODE_NAME_LABEL = "nodename";
     private final LinkedHashMap<String, Integer> headerConstantMap = new LinkedHashMap<>();
@@ -45,8 +50,10 @@ public class CsvHeader {
             columnNames[sayac] = s;
             sayac++;
         }
-        String reportColumnHeaders = CsvRow.getCsvRow(columnNames);
-
+        logger.debug(String.format("Order of Column Headers are prepared, first two are always permanent, the rest are located in template name node:\n\n%s\n%s",
+                String.join("\n", headerConstantMap.keySet()),
+                String.join("\n", headerVariantMap.keySet())));
+        String reportColumnHeaders = CsvDataRow.getCsvRow(columnNames);
         return(reportColumnHeaders);
     }
 

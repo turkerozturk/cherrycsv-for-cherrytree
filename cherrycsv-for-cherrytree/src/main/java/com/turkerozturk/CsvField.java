@@ -15,10 +15,16 @@
  ***********************************************************************/
 package com.turkerozturk;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.util.AbstractMap;
 import java.util.regex.Pattern;
 
 public class CsvField {
+
+    private static final Logger logger = LogManager.getLogger(CsvField.class);
+
     public static final String NULL_VALUE_REPRESENTATION = "___";
     public static final String KEY_VALUE_PAIR_SEPARATOR = ("|||");
     public AbstractMap.SimpleEntry<String, String> parseKeyValuePair(String pairAsString) {

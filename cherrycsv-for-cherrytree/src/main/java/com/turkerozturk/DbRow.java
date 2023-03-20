@@ -15,23 +15,39 @@
  ***********************************************************************/
 package com.turkerozturk;
 
-public class DbRow {
-    public String buildSecondQuery(long nodeId) {
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-        return " select dugum.node_id, dugum.name, cocuk.parameters\n" +
+import java.sql.*;
+
+public class DbRow {
+    private static final Logger logger = LogManager.getLogger(DbRow.class);
+    public ResultSet buildSecondQuery(long nodeId, Connection connection) throws SQLException {
+
+         String queryString = " select dugum.node_id, dugum.name, cocuk.parameters\n" +
                 "        from node as dugum\n" +
                 "        left join\n" +
                 "\n" +
                 "        (\n" +
-                "        select *, group_concat(name || \"" + CsvField.KEY_VALUE_PAIR_SEPARATOR + "\" || txt , CHAR(11)) as parameters from children\n" +
+                "        select *, group_concat(name || ? || txt , CHAR(11)) as parameters from children\n" +
                 "        left join node\n" +
                 "        on node.node_id = children.node_id\n" +
                 "\n" +
-                "        where children.father_id = " + nodeId + " and syntax = \"plain-text\"\n" +
+                "        where children.father_id = ? and syntax = \"plain-text\"\n" +
                 "        order by sequence\n" +
                 "        ) as cocuk\n" +
                 "\n" +
-                "        where dugum.node_id = " + nodeId + ";";
+                "        where dugum.node_id = ?;";
+
+        PreparedStatement statement = connection.prepareStatement(queryString);
+        statement.setString(1, CsvField.KEY_VALUE_PAIR_SEPARATOR);
+        statement.setLong(2, nodeId);
+        statement.setLong(3, nodeId);
+
+
+        logger.debug(String.format("Building the SQL query to obtain the 'data node's as key-value pairs from the 'chosen node'\n\n%s", statement.toString()));
+        ResultSet resultSet = statement.executeQuery();
+        return resultSet;
     }
 
 }

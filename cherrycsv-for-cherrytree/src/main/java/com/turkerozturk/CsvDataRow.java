@@ -15,11 +15,16 @@
  ***********************************************************************/
 package com.turkerozturk;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.util.AbstractMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 
-public class CsvRow {
+public class CsvDataRow {
+
+    private static final Logger logger = LogManager.getLogger(CsvDataRow.class);
     public final static String TAB_PLACEHOLDER = "{TAB}";
     public final static String NEWLINE_PLACEHOLDER = "{NEWLINE}";
     private final StringBuilder unIdentifiedKeyNodeNames = new StringBuilder();
@@ -27,29 +32,31 @@ public class CsvRow {
     private final long nodeId;
     private final String projectName;
     private LinkedHashSet<String> labelsMissingWillBeCreated;
-    private final CsvHeader csvHeader;
-    public CsvRow(long nodeId, String projectName, CsvHeader csvHeader) {
+    private final CsvHeaderRow csvHeaderRow;
+    public CsvDataRow(long nodeId, String projectName, CsvHeaderRow csvHeaderRow) {
         this.nodeId = nodeId;
         this.projectName = projectName;
-        this.csvHeader = csvHeader;
+        this.csvHeaderRow = csvHeaderRow;
     }
     public String parsePairsArray(String parametrelerRaw) {
 
-        String[] values = new String[csvHeader.getColumnCount()];
+        String[] values = new String[csvHeaderRow.getColumnCount()];
 
-        int nodeIdLabelPosition = csvHeader.getHeaderConstantMap().get(CsvHeader.NODE_ID_LABEL);
+        int nodeIdLabelPosition = csvHeaderRow.getHeaderConstantMap().get(CsvHeaderRow.NODE_ID_LABEL);
         values[nodeIdLabelPosition] = String.valueOf(nodeId);
-        int nodeNamePosition = csvHeader.getHeaderConstantMap().get(CsvHeader.NODE_NAME_LABEL);
+        int nodeNamePosition = csvHeaderRow.getHeaderConstantMap().get(CsvHeaderRow.NODE_NAME_LABEL);
         values[nodeNamePosition] = projectName;
 
         LinkedHashSet<String> labels = new LinkedHashSet<>();
-        for(String label : csvHeader.getHeaderVariantMap().keySet()) {
+        for(String label : csvHeaderRow.getHeaderVariantMap().keySet()) {
             labels.add(label);
         }
         labelsMissingWillBeCreated = new LinkedHashSet<>(labels);
 
         LinkedHashMap<String, Integer> columnVariantMap = new LinkedHashMap<>();
-
+        logger.debug(String.format("We will split each key-value pair using %s string as separator.\n\n" +
+                        "And if a value is null or empty, we put %s string as empty string placeholder.",
+                CsvField.KEY_VALUE_PAIR_SEPARATOR, CsvField.NULL_VALUE_REPRESENTATION));
         if(parametrelerRaw != null) {
             String[] pairsArrayAstring = parametrelerRaw.split(KEY_VALUE_PAIRS_ARRAY_SEPARATOR);
             for (String pairAsString : pairsArrayAstring) {
@@ -57,7 +64,7 @@ public class CsvRow {
                 AbstractMap.SimpleEntry<String, String> keyValue = csvField.parseKeyValuePair(pairAsString);
                 if (keyValue.getKey() != null) {
                     labelsMissingWillBeCreated.remove(keyValue.getKey());
-                    int position = csvHeader.getHeaderVariantMap().get(keyValue.getKey());
+                    int position = csvHeaderRow.getHeaderVariantMap().get(keyValue.getKey());
                     columnVariantMap.put(keyValue.getValue(), position);
                     String value = keyValue.getValue().replaceAll("\t",TAB_PLACEHOLDER)
                             .replaceAll("\r", "")
@@ -69,7 +76,7 @@ public class CsvRow {
                 } else {
                     // REPRESENTS WHETHER IF THERE IS A PROBLEM WITH KEY AND VALUE SEPARATION. NOT TESTED.
                     unIdentifiedKeyNodeNames.append(String.format("%s, ", pairAsString));
-                    System.out.println("WARNING: unIdentifiedKeyNodeNames: \"" + unIdentifiedKeyNodeNames + "\" ");
+                    logger.debug(String.format("WARNING: unIdentifiedKeyNodeNames:\n\n%s", unIdentifiedKeyNodeNames));
                 }
             }
         }
@@ -77,6 +84,7 @@ public class CsvRow {
             if (values[i] == null) {
                 values[i] = CsvField.NULL_VALUE_REPRESENTATION;
             }
+            logger.debug(String.format("%s. column value: \"%s\"", i + 1, values[i]));
         }
 
         String csvColumnCellContent = getCsvRow(values);
