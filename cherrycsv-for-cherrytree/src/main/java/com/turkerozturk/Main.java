@@ -87,8 +87,13 @@ public class Main {
             fullLocalPathToCherryDb = args[0];
             try {
                 Path p = Paths.get(fullLocalPathToCherryDb);
-                inputPath = p.getParent().toString();
-                inputFilename = p.getFileName().toString();
+                if(p.isAbsolute()) {
+                    inputPath = p.getParent().toString();
+                    inputFilename = p.getFileName().toString();
+                } else {
+                    inputPath = WORKING_DIR;
+                    inputFilename = fullLocalPathToCherryDb;
+                }
             } catch (InvalidPathException | NullPointerException ex) {
                 logger.error("ERROR: File Path is invalid: \"" + fullLocalPathToCherryDb + "\"\n\n" +
                         helpTextForUsage);
